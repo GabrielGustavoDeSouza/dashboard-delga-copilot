@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
+import plotly.express as px
 
 st.set_page_config(
     page_title="Dashboard Executivo Delga",
@@ -9,49 +9,39 @@ st.set_page_config(
     layout="wide"
 )
 
-# ====================================================================
-# HELPERS
-# ====================================================================
-
 def safe(v):
     try:
+        if pd.isna(v):
+            return 0
         return float(v)
     except:
-        return 0.0
+        return 0
 
-def fmt_mi(v):
-    return f"R$ {v/1000000:.2f} Mi"
-
-# ====================================================================
-# HEADER
-# ====================================================================
+def moeda(v):
+    return f"R$ {v:,.0f}".replace(",", ".")
 
 st.title("📊 Dashboard Executivo Delga")
-st.caption("Versão Copilot Research")
 
 arquivo = st.file_uploader(
     "Selecione a planilha",
     type=["xlsx"]
 )
 
-if not arquivo:
-    st.info("Faça upload da planilha.")
+if arquivo is None:
     st.stop()
 
 excel = pd.ExcelFile(arquivo)
-
-# ====================================================================
-# LOCALIZA ABA CONSOLIDADA
-# ====================================================================
 
 aba_consolidada = None
 
 for aba in excel.sheet_names:
     if "5 Unidades" in aba:
         aba_consolidada = aba
+        break
 
 if aba_consolidada is None:
     st.error("Aba consolidada não encontrada.")
+    st.write(excel.sheet_names)
     st.stop()
 
 base = pd.read_excel(
@@ -60,27 +50,31 @@ base = pd.read_excel(
     header=None
 )
 
-# ====================================================================
-# KPIS
-# ====================================================================
+st.success("Planilha carregada")
 
-meta = safe(base.iloc[6,3])
-portfolio = safe(base.iloc[6,4])
-validado_anual = safe(base.iloc[6,5])
-previsto_2026 = safe(base.iloc[6,6])
-validado_2026 = safe(base.iloc[6,7])
-real = safe(base.iloc[6,10])
-extra_dre = safe(base.iloc[6,11])
-iniciativas = int(safe(base.iloc[6,14]))
+try:
+
+    meta = safe(base.iloc[6,3])
+    portfolio = safe(base.iloc[6,4])
+    validado_anual = safe(base.iloc[6,5])
+    previsto2026 = safe(base.iloc[6,6])
+    validado2026 = safe(base.iloc[6,7])
+
+    real = safe(base.iloc[6,10])
+    extra = safe(base.iloc[6,11])
+
+    iniciativas = safe(base.iloc[6,14])
+
+except Exception as e:
+
+    st.error(f"Erro lendo KPIs: {e}")
+    st.dataframe(base.head(15))
+    st.stop()
 
 atingimento = 0
 
 if meta > 0:
     atingimento = (real / meta) * 100
-
-# ====================================================================
-# CARDS
-# ====================================================================
 
 st.subheader("Resumo Executivo")
 
@@ -88,163 +82,68 @@ c1,c2,c3,c4 = st.columns(4)
 
 c1.metric(
     "Meta Grupo",
-    fmt_mi(meta)
+    moeda(meta)
 )
 
 c2.metric(
-    "Retorno Previsto",
-    fmt_mi(portfolio)
+    "Portfolio",
+    moeda(portfolio)
 )
 
 c3.metric(
-    "Retorno Validado",
-    fmt_mi(validado_anual)
+    "Validado Anual",
+    moeda(validado_anual)
 )
 
 c4.metric(
     "Iniciativas",
-    iniciativas
+    int(iniciativas)
 )
 
 c5,c6,c7,c8 = st.columns(4)
 
 c5.metric(
     "Previsto 2026",
-    fmt_mi(previsto_2026)
+    moeda(previsto2026)
 )
 
 c6.metric(
     "Validado 2026",
-    fmt_mi(validado_2026)
+    moeda(validado2026)
 )
 
 c7.metric(
     "Retorno Real",
-    fmt_mi(real)
+    moeda(real)
 )
 
 c8.metric(
     "Extra DRE",
-    fmt_mi(extra_dre)
+    moeda(extra)
 )
 
-# ====================================================================
-# GAUGE + FUNIL
-# ====================================================================
+st.divider()
 
 col1,col2 = st.columns([1,2])
 
 with col1:
 
-    fig_gauge = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=atingimento,
-        number={"suffix":"%"},
-        title={"text":"Atingimento"},
-        gauge={
-            "axis":{"range":[0,100]},
-            "bar":{"color":"darkblue"},
-            "steps":[
-                {"range":[0,40],"color":"#ffe5e5"},
-                {"range":[40,80],"color":"#fff1c9"},
-                {"range":[80,100],"color":"#dff5df"}
-            ]
-        }
-    ))
-
-    st.plotly_chart(
-        fig_gauge,
-        use_container_width=True
-    )
-
-with col2:
-
-    df_funil = pd.DataFrame({
-        "Etapa":[
-            "Meta Grupo",
-            "Portfólio",
-            "Previsto 2026",
-            "Validado",
-            "Real"
-        ],
-        "Valor":[
-            meta,
-            portfolio,
-            previsto_2026,
-            validado_2026,
-            real
-        ]
-    })
-
-    fig_funil = px.funnel(
-        df_funil,
-        x="Valor",
-        y="Etapa",
-        color="Etapa"
-    )
-
-    st.plotly_chart(
-        fig_funil,
-        use_container_width=True
-    )
-
-# ====================================================================
-# META X REAL
-# ====================================================================
-
-st.subheader("Meta x Real por Unidade")
-
-dados = []
-
-abas = [
-    "Diadema",
-    "Ferraz",
-    "Jarinu",
-    "São Leopoldo",
-    "Anchieta",
-    "Compras "
-]
-
-for aba in abas:
-
-    try:
-
-        d = pd.read_excel(
-            arquivo,
-            sheet_name=aba,
-            header=None
+    fig = go.Figure(
+        go.Indicator(
+            mode="gauge+number",
+            value=atingimento,
+            number={"suffix":"%"},
+            title={"text":"Atingimento"},
+            gauge={
+                "axis":{"range":[0,100]},
+                "bar":{"color":"darkblue"},
+                "steps":[
+                    {"range":[0,40],"color":"#ffdddd"},
+                    {"range":[40,80],"color":"#fff4cc"},
+                    {"range":[80,100],"color":"#ddffdd"}
+                ]
+            }
         )
-
-        dados.append({
-            "Unidade": aba.strip(),
-            "Meta": safe(d.iloc[4,0]),
-            "Real": safe(d.iloc[4,6])
-        })
-
-    except:
-        pass
-
-if len(dados) > 0:
-
-    unidade_df = pd.DataFrame(dados)
-
-    fig = go.Figure()
-
-    fig.add_bar(
-        x=unidade_df["Unidade"],
-        y=unidade_df["Meta"],
-        name="Meta"
-    )
-
-    fig.add_bar(
-        x=unidade_df["Unidade"],
-        y=unidade_df["Real"],
-        name="Real"
-    )
-
-    fig.update_layout(
-        barmode="group",
-        height=450
     )
 
     st.plotly_chart(
@@ -252,11 +151,95 @@ if len(dados) > 0:
         use_container_width=True
     )
 
-# ====================================================================
-# TOP PROJETOS
-# ====================================================================
+with col2:
 
-st.subheader("Top Projetos")
+    funil = pd.DataFrame({
+        "Etapa":[
+            "Meta",
+            "Portfolio",
+            "Previsto 2026",
+            "Validado",
+            "Real"
+        ],
+        "Valor":[
+            meta,
+            portfolio,
+            previsto2026,
+            validado2026,
+            real
+        ]
+    })
+
+    fig2 = px.funnel(
+        funil,
+        x="Valor",
+        y="Etapa",
+        color="Etapa"
+    )
+
+    st.plotly_chart(
+        fig2,
+        use_container_width=True
+    )
+
+st.divider()
+
+dados_unidades = []
+
+for aba in [
+    "Diadema",
+    "Ferraz",
+    "Jarinu",
+    "São Leopoldo",
+    "Anchieta",
+    "Compras "
+]:
+
+    try:
+
+        df = pd.read_excel(
+            arquivo,
+            sheet_name=aba,
+            header=None
+        )
+
+        dados_unidades.append({
+            "Unidade": aba.strip(),
+            "Meta": safe(df.iloc[4,0]),
+            "Real": safe(df.iloc[4,6])
+        })
+
+    except:
+        pass
+
+if len(dados_unidades):
+
+    uni = pd.DataFrame(dados_unidades)
+
+    fig3 = go.Figure()
+
+    fig3.add_bar(
+        x=uni["Unidade"],
+        y=uni["Meta"],
+        name="Meta"
+    )
+
+    fig3.add_bar(
+        x=uni["Unidade"],
+        y=uni["Real"],
+        name="Real"
+    )
+
+    fig3.update_layout(
+        title="Meta x Real por Unidade",
+        barmode="group",
+        height=450
+    )
+
+    st.plotly_chart(
+        fig3,
+        use_container_width=True
+    )
 
 try:
 
@@ -266,42 +249,36 @@ try:
         header=None
     )
 
+    st.subheader("Top 5 Projetos")
+
     st.dataframe(
         top,
         use_container_width=True
     )
 
 except:
-    st.warning("Aba Top 5 Projetos não encontrada.")
+    st.warning("Não foi possível carregar Top 5 Projetos.")
 
-# ====================================================================
-# INSIGHTS
-# ====================================================================
+st.divider()
 
-st.subheader("Copilot Insights")
+st.subheader("Insights")
 
 gap = meta - real
 
 if portfolio > meta:
-
     st.success(
-        "✅ O portfólio projetado supera a meta anual."
+        "✅ O portfólio supera a meta do grupo."
     )
 
 if atingimento < 20:
-
-    st.error(
-        f"⚠ Atingimento atual da meta: {atingimento:.1f}%."
+    st.warning(
+        f"⚠ Atingimento atual: {atingimento:.1f}%"
     )
 
-if gap > 0:
-
-    st.info(
-        f"📌 Gap atual para atingir a meta: {fmt_mi(gap)}"
-    )
-
-st.divider()
-
-st.caption(
-    "Dashboard experimental gerado automaticamente por Copilot."
+st.info(
+    f"Gap para meta: {moeda(gap)}"
 )
+
+st.subheader("Abas encontradas")
+
+st.write(excel.sheet_names)
