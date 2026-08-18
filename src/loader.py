@@ -1,6 +1,6 @@
 import pandas as pd
 
-ARQUIVO = "data/Controle_Indicadores_Delga_2026.xlsx"
+ARQUIVO = "Controle_Indicadores_Delga_2026_v360 (48).xlsx"
 
 def carregar_dados():
     return pd.read_excel(
