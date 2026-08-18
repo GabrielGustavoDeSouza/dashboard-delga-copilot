@@ -1,22 +1,5 @@
-import plotly.express as px
-import pandas as pd
+import streamlit as st
 
-df = pd.DataFrame({
-    "Projeto":[
-        "Dana",
-        "Reestruturação",
-        "Desmoldante",
-        "Venda Robôs",
-        "Scania"
-    ],
-    "Retorno":[
-        1154706,
-        933084,
-        525129,
-        390000,
-        282888
-    ]
-})
+st.title("Pareto")
 
-fig = px.bar(df,x="Projeto",y="Retorno")
-``
+st.write("Análise Pareto em desenvolvimento")
