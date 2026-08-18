@@ -16,15 +16,11 @@ arquivo = st.file_uploader(
     type=["xlsx"]
 )
 
-if arquivo:
+if arquivo is not None:
 
     excel = pd.ExcelFile(arquivo)
 
-    st.success("Planilha carregada")
-
-    # ==========================
-    # DASHBOARD GRUPO
-    # ==========================
+    st.success("Planilha carregada com sucesso")
 
     aba_grupo = None
 
@@ -34,7 +30,9 @@ if arquivo:
             break
 
     if aba_grupo is None:
-        st.error("Aba de consolidação não encontrada.")
+        st.error(
+            f"Aba principal não encontrada. Abas localizadas: {excel.sheet_names}"
+        )
         st.stop()
 
     grupo = pd.read_excel(
@@ -43,82 +41,88 @@ if arquivo:
         header=None
     )
 
-    meta = float(grupo.iloc[6,3])
-    previsto = float(grupo.iloc[6,4])
-    validado = float(grupo.iloc[6,5])
-    previsto2026 = float(grupo.iloc[6,6])
-    validado2026 = float(grupo.iloc[6,7])
-    real = float(grupo.iloc[6,10])
-    extra = float(grupo.iloc[6,11])
-    iniciativas = int(grupo.iloc[6,14])
+    try:
 
-    col1,col2,col3,col4 = st.columns(4)
+        meta = float(grupo.iloc[6,3])
+        previsto = float(grupo.iloc[6,4])
+        validado = float(grupo.iloc[6,5])
+        previsto2026 = float(grupo.iloc[6,6])
+        validado2026 = float(grupo.iloc[6,7])
+        real = float(grupo.iloc[6,10])
+        extra = float(grupo.iloc[6,11])
+        iniciativas = int(grupo.iloc[6,14])
 
-    col1.metric(
+    except Exception as e:
+        st.error(f"Erro lendo os KPIs da planilha: {e}")
+        st.stop()
+
+    percentual = (real / meta) * 100 if meta > 0 else 0
+
+    st.subheader("Resumo Executivo")
+
+    c1,c2,c3,c4 = st.columns(4)
+
+    c1.metric(
         "Meta Grupo",
         f"R$ {meta/1000000:.2f} Mi"
     )
 
-    col2.metric(
+    c2.metric(
         "Retorno Previsto",
         f"R$ {previsto/1000000:.2f} Mi"
     )
 
-    col3.metric(
+    c3.metric(
         "Retorno Validado",
         f"R$ {validado/1000000:.2f} Mi"
     )
 
-    col4.metric(
+    c4.metric(
         "Iniciativas",
-        iniciativas
+        f"{iniciativas}"
     )
 
-    col5,col6,col7,col8 = st.columns(4)
+    c5,c6,c7,c8 = st.columns(4)
 
-    col5.metric(
+    c5.metric(
         "Previsto 2026",
         f"R$ {previsto2026/1000000:.2f} Mi"
     )
 
-    col6.metric(
+    c6.metric(
         "Validado 2026",
         f"R$ {validado2026/1000000:.2f} Mi"
     )
 
-    col7.metric(
+    c7.metric(
         "Retorno Real",
         f"R$ {real/1000000:.2f} Mi"
     )
 
-    col8.metric(
+    c8.metric(
         "Extra DRE",
         f"R$ {extra/1000000:.2f} Mi"
     )
 
     st.divider()
 
-    # ==========================
-    # GAUGE META
-    # ==========================
+    col_esq, col_dir = st.columns([1, 2])
 
-    percentual = (real / meta) * 100
+    with col_esq:
 
-    g1,g2 = st.columns([2,3])
+        fig_gauge = go.Figure()
 
-    with g1:
-
-        fig_gauge = go.Figure(go.Indicator(
+        fig_gauge.add_trace(go.Indicator(
             mode="gauge+number",
             value=percentual,
-            number={'suffix': "%"},
-            title={'text': "Atingimento da Meta"},
+            number={"suffix":"%"},
+            title={"text":"Atingimento da Meta"},
             gauge={
-                'axis': {'range': [0,100]},
-                'bar': {'color': '#0E4C92'},
-                'steps': [
-                    {'range':[[2={'suffix': {'color': '#0E4C92'},           {'range':[40,80],'color':'#fff4d6'},
-                    {'range':[80,100],'color':'#e8f5e9'}
+                "axis":{"range":[0,100]},
+                "bar":{"color":"#0E4C92"},
+                "steps":[
+                    {"range[1, .F":[0,40],"color":"#ffdede                  {"range":[40,80],"color":"#fff0c7"},
+                    {"range":[80,100],"color":"#dff5df"}
                 ]
             }
         ))
@@ -128,9 +132,9 @@ if arquivo:
             use_container_width=True
         )
 
-    with g2:
+    with col_dir:
 
-        funnel = pd.DataFrame({
+        df_funil = pd.DataFrame({
             "Etapa":[
                 "Meta Grupo",
                 "Retorno Previsto",
@@ -146,9 +150,10 @@ if arquivo:
         })
 
         fig_funil = px.funnel(
-            funnel,
+            df_funil,
             x="Valor",
-            y="Etapa"
+            y="Etapa",
+            color="Etapa"
         )
 
         st.plotly_chart(
@@ -158,13 +163,9 @@ if arquivo:
 
     st.divider()
 
-    # ==========================
-    # UNIDADES
-    # ==========================
-
     unidades = []
 
-    abas = [
+    abas_unidades = [
         "Diadema",
         "Ferraz",
         "Jarinu",
@@ -173,7 +174,7 @@ if arquivo:
         "Compras "
     ]
 
-    for aba in abas:
+    for aba in abas_unidades:
 
         try:
 
@@ -183,47 +184,45 @@ if arquivo:
                 header=None
             )
 
-            unidades.append(
-                {
-                    "Unidade": aba.strip(),
-                    "Meta": float(df.iloc[4,0]),
-                    "Real": float(df.iloc[4,6])
-                }
-            )
+            unidades.append({
+                "Unidade": aba.strip(),
+                "Meta": float(df.iloc[4,0]),
+                "Real": float(df.iloc[4,6])
+            })
 
         except:
             pass
 
-    unidades = pd.DataFrame(unidades)
+    if len(unidades) > 0:
 
-    if len(unidades)>0:
-
-        fig = go.Figure()
-
-        fig.add_bar(
-            name="Meta",
-            x=unidades["Unidade"],
-            y=unidades["Meta"]
-        )
-
-        fig.add_bar(
-            name="Real",
-            x=unidades["Unidade"],
-            y=unidades["Real"]
-        )
+        df_unidades = pd.DataFrame(unidades)
 
         st.subheader("Meta x Real por Unidade")
 
+        fig_unidades = go.Figure()
+
+        fig_unidades.add_bar(
+            name="Meta",
+            x=df_unidades["Unidade"],
+            y=df_unidades["Meta"]
+        )
+
+        fig_unidades.add_bar(
+            name="Real",
+            x=df_unidades["Unidade"],
+            y=df_unidades["Real"]
+        )
+
+        fig_unidades.update_layout(
+            barmode="group"
+        )
+
         st.plotly_chart(
-            fig,
+            fig_unidades,
             use_container_width=True
         )
 
     st.divider()
-
-    # ==========================
-    # TOP 5 PROJETOS
-    # ==========================
 
     try:
 
@@ -241,37 +240,30 @@ if arquivo:
         )
 
     except:
-
-        st.warning(
-            "Aba Top 5 Projetos não encontrada."
-        )
+        st.warning("Não foi possível carregar Top 5 Projetos.")
 
     st.divider()
 
-    # ==========================
-    # INSIGHTS
-    # ==========================
-
     st.subheader("Copilot Insights")
-
-    if percentual < 20:
-        st.error(
-            f"Atingimento da meta em apenas {percentual:.1f}%."
-        )
-
-    if previsto > meta:
-        st.success(
-            "Portfólio previsto supera a meta anual."
-        )
 
     gap = meta - real
 
+    if previsto > meta:
+        st.success(
+            "✅ O portfólio previsto supera a meta anual do grupo."
+        )
+
+    if percentual < 20:
+        st.error(
+            f"⚠ Atingimento da meta está em apenas {percentual:.1f}%."
+        )
+
     st.info(
-        f"Gap atual para atingir a meta: R$ {gap/1000000:.2f} Mi"
+        f"📌 Gap atual para atingir a meta: R$ {gap/1000000:.2f} Mi"
     )
 
 else:
 
     st.info(
-        "Faça upload da planilha para iniciar."
+        "Faça upload da planilha para iniciar a análise."
     )
