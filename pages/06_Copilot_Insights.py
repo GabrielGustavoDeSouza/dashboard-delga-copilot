@@ -1,9 +1,12 @@
-if percentual < 20:
-    st.warning(
-        "⚠ Unidade abaixo de 20% da meta anual."
-    )
+import streamlit as st
 
-if percentual > 50:
-    st.success(
-        "✅ Unidade acima de 50% da meta."
-    )
+st.title("Copilot Insights")
+
+st.info(
+    """
+    Dashboard carregado.
+
+    Os insights automáticos serão exibidos
+    após integração com a base Excel.
+    """
+)
